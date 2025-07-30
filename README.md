@@ -1,75 +1,59 @@
-![](header.png)
+[![MinIO Version](https://img.shields.io/badge/Minio-latest-blue.svg)]() [![Dokku Version](https://img.shields.io/badge/Dokku-v0.35.20-blue.svg)]()
 
-[![Minio Version](https://img.shields.io/badge/Minio-latest-blue.svg)]() [![Dokku Version](https://img.shields.io/badge/Dokku-v0.11.2-blue.svg)]()
+# Run MinIO on Dokku
 
-# Run Minio on Dokku
+### What is MinIO?
 
-## Perquisites
-
-### What is Minio?
-
-Minio is an object storage server, and API compatible with Amazon S3 cloud
-storage service. Read more at the [minio.io](https://www.minio.io/) website.
+[MinIO](https://www.minio.io) is a high-performance, S3 compatible object storage.
 
 ### What is Dokku?
 
-[Dokku](http://dokku.viewdocs.io/dokku/) is the smallest PaaS implementation
-you've ever seen - _Docker powered mini-Heroku_.
+[Dokku](http://dokku.com/) is an open source PAAS alternative to Heroku. It helps you build and manage the lifecycle of applications from building to scaling.
 
-### Requirements
+## Getting started
 
-* A working [Dokku host](http://dokku.viewdocs.io/dokku/getting-started/installation/)
+We are going to use the domain `minio.example.com` and Dokku app `minio` for demonstration purposes. Make sure to replace it.
 
-# Setup
-
-We are going to use the domain `minio.example.com` and Dokku app `minio` for
-demonstration purposes. Make sure to replace it.
-
-## Create the app
-
-Log onto your Dokku Host to create the Minio app:
+Open the connection to the remote server and run:
 
 ```bash
+# Create the dokku app
 dokku apps:create minio
+
+# Set the environment variables
+dokku config:set minio MINIO_ROOT_USER=$(echo `openssl rand -base64 45` | tr -d \=+ | cut -c 1-20)
+dokku config:set minio MINIO_ROOT_PASSWORD=$(echo `openssl rand -base64 45` | tr -d \=+ | cut -c 1-48)
+dokku config:set minio NGINX_MAX_REQUEST_BODY=100M
+dokku config:set minio MINIO_DOMAIN=minio.example.com
+
+# Set the domain
+dokku domains:set minio minio.example.com
 ```
 
-## Configuration
-
-### Setting environment variables
-
-Minio uses two access keys (`ACCESS_KEY` and `SECRET_KEY`) for authentication
-and object management. The following commands sets a random strings for each
-access key.
+Close the connection to the server. Clone this repository onto your machine, and deploy the code.
 
 ```bash
-dokku config:set --no-restart minio MINIO_ROOT_USER=$(echo `openssl rand -base64 45` | tr -d \=+ | cut -c 1-20)
-dokku config:set --no-restart minio MINIO_ROOT_PASSWORD=$(echo `openssl rand -base64 45` | tr -d \=+ | cut -c 1-32)
+git clone git@github.com:josuemontano/minio-dokku.git
+cd minio-dokku
+
+git remote add production dokku@[IP_v4]:minio
+git push production
 ```
 
-To login in the browser or via API, you will need to supply both the
-`ACCESS_KEY` and `SECRET_KEY`. You can retrieve these at any time while logged
-in on your host running dokku via `dokku config minio`.
-
-> **Note:** if you do not set these keys, Minio will generate them during
-> startup and output them to the log (check if via `dokku logs minio`). You
-> will still need to set them manually.
-
-You'll also need to set other two environment variables:
-
-- `NGINX_MAX_REQUEST_BODY`: used in the custom `nginx.conf` for this Dokku app
-  to allow uploads up to 15MB to the HTTP server (if the file size is greater
-  than 15MB, `s3cmd` will split in 15MB parts).
-- `MINIO_DOMAIN`: used to tell Minio the domain name being used by the server.
+Now, open the connection to the remote server once again and run:
 
 ```bash
-dokku config:set --no-restart minio NGINX_MAX_REQUEST_BODY=15M
-dokku config:set --no-restart minio MINIO_DOMAIN=minio.example.com
+# Generate an SSL certificate with Let's Encrypt
+sudo dokku plugin:install https://github.com/dokku/dokku-letsencrypt.git
+dokku letsencrypt:set minio email user@example.com
+dokku letsencrypt:enable minio
+
+# Map ports
+dokku ports:set minio http:80:9000
+dokku ports:set minio https:443:9000
 ```
 
-> **Note**: if you're using [s4cmd](https://github.com/bloomreach/s4cmd/)
-> instead, be sure to pass the following parameters:
-> `--multipart-split-size=15728640 --max-singlepart-upload-size=15728640`.
-
+Your Minio instance should now be available on [minio.example.com](https://minio.example.com).
 
 ## Persistent storage
 
@@ -103,74 +87,13 @@ First add the correct port mapping for this project as defined in the parent
 `Dockerfile`.
 
 ```bash
-dokku proxy:ports-add minio http:80:9000
-dokku proxy:ports-add minio https:443:9000
-dokku proxy:ports-add minio https:9001:9001
+dokku ports:add minio http:80:9000
+dokku ports:add minio https:443:9000
+dokku ports:add minio https:9001:9001
 ```
 
 Next remove the proxy mapping added by Dokku.
 
 ```bash
-dokku proxy:ports-remove minio http:80:5000
+dokku ports:remove minio http:80:5000
 ```
-
-## Push Minio to Dokku
-
-### Grabbing the repository
-
-First clone this repository onto your machine.
-
-#### Via SSH
-
-```bash
-git clone git@github.com:slypix/minio-dokku.git
-```
-
-#### Via HTTPS
-
-```bash
-git clone https://github.com/slypix/minio-dokku.git
-```
-
-### Set up git remote
-
-Now you need to set up your Dokku server as a remote.
-
-```bash
-git remote add dokku dokku@example.com:minio
-```
-
-### Push Minio
-
-Now we can push Minio to Dokku (_before_ moving on to the [next
-part](#domain-and-ssl-certificate)).
-
-```bash
-git push dokku master
-```
-
-## SSL certificate
-
-Last but not least, we can go an grab the SSL certificate from [Let's
-Encrypt](https://letsencrypt.org/).
-You'll need [dokku-letsencrypt plugin](https://github.com/dokku/dokku-letsencrypt) installed. If it's not, install by running:
-
-```bash
-dokku plugin:install https://github.com/dokku/dokku-letsencrypt.git
-```
-
-Now get the SSL certificate:
-
-```bash
-dokku config:set --no-restart minio DOKKU_LETSENCRYPT_EMAIL=you@example.com
-dokku letsencrypt:enable minio
-dokku proxy:ports-set minio https:443:9000
-```
-
-> **Note**: you must execute these steps *after* pushing the app to Dokku
-> host.
-
-## Wrapping up
-
-Your Minio instance should now be available on
-[minio.example.com](https://minio.example.com).
