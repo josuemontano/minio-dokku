@@ -69,4 +69,7 @@ Dokku to mount it to the app container.
 sudo mkdir -p /var/lib/dokku/data/storage/minio
 sudo chown 32769:32769 /var/lib/dokku/data/storage/minio
 dokku storage:mount minio /var/lib/dokku/data/storage/minio:/home/dokku/data
+
+# Restart the app
+dokku ps:restart minio
 ```
