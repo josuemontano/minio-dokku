@@ -1,4 +1,4 @@
-FROM minio/minio:RELEASE.2025-07-23T15:54:02Z
+FROM minio/minio:RELEASE.2025-07-23T15-54-02Z
 
 # Create data directory for the user, where we will keep the data
 USER root
