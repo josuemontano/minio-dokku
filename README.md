@@ -51,6 +51,10 @@ dokku letsencrypt:enable minio
 # Map ports
 dokku ports:set minio http:80:9000
 dokku ports:set minio https:443:9000
+dokku ports:add minio https:9001:9001
+
+# Allow traffic through the 9001 port for the MinIO console
+sudo ufw allow 9001/tcp
 ```
 
 Your Minio instance should now be available on [minio.example.com](https://minio.example.com).
@@ -65,35 +69,4 @@ Dokku to mount it to the app container.
 sudo mkdir -p /var/lib/dokku/data/storage/minio
 sudo chown 32769:32769 /var/lib/dokku/data/storage/minio
 dokku storage:mount minio /var/lib/dokku/data/storage/minio:/home/dokku/data
-```
-
-## Domain setup
-
-To get the routing working, we need to apply a few settings. First we set
-the domain.
-
-```bash
-dokku domains:set minio minio.example.com
-```
-
-The parent Dockerfile, provided by the [Minio
-project](https://github.com/minio/minio), exposes port `9000` for web requests.
-Dokku will set up this port for outside communication, as explained in [its
-documentation](http://dokku.viewdocs.io/dokku/advanced-usage/proxy-management/#proxy-port-mapping).
-Because we want Minio to be available on the default port `80` (or `443` for
-SSL), we need to fiddle around with the proxy settings.
-
-First add the correct port mapping for this project as defined in the parent
-`Dockerfile`.
-
-```bash
-dokku ports:add minio http:80:9000
-dokku ports:add minio https:443:9000
-dokku ports:add minio https:9001:9001
-```
-
-Next remove the proxy mapping added by Dokku.
-
-```bash
-dokku ports:remove minio http:80:5000
 ```
